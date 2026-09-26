@@ -5,7 +5,8 @@
  * anything itself; the agent loop and BudgetGuard decide whether a proposal
  * runs.
  */
-import OpenAI from "openai";
+import { OpenAI } from "openai";
+import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 import { z } from "zod";
 import { config } from "../config.js";
 
@@ -152,7 +153,7 @@ export function createServPlanner(): Planner {
     name: `SERV Reasoning (${model})`,
     async propose(input) {
       // SERV requires a system message and max_completion_tokens (not max_tokens), and no temperature.
-      const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
+      const messages: ChatCompletionMessageParam[] = [
         { role: "system", content: SYSTEM },
         { role: "user", content: renderInput(input) },
       ];

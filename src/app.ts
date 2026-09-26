@@ -1,13 +1,3 @@
-/**
- * Tender: one server for everything.
- *   /              website            (public/index.html)
- *   /app           dashboard          (public/app.html)
- *   /api/*         dashboard API, live runs over SSE
- *   /catalog, /data/*   the x402 seller (same server; the agent pays it over HTTP)
- *
- * Locally `npm run demo` listens on APP_PORT (3000). On Vercel this file is the
- * function entry: the app is the default export and Vercel serves public/ itself.
- */
 import express from "express";
 import { fileURLToPath } from "node:url";
 import path from "node:path";

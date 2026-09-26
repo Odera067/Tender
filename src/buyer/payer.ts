@@ -15,9 +15,9 @@ import { x402Client, wrapFetchWithPayment, decodePaymentResponseHeader } from "@
 import { registerExactEvmScheme } from "@x402/evm/exact/client";
 import { decodePaymentRequiredHeader } from "@x402/core/http";
 import { createWalletClient, http, erc20Abi, formatUnits } from "viem";
-import { privateKeyToAccount } from "viem/accounts";
+import { privateKeyToAccount, toAccount } from "viem/accounts";
 import { base, baseSepolia } from "viem/chains";
-import { AGENTKIT_NETWORK, EXPLORER, USDC, config } from "../config.js";
+import { EXPLORER, USDC, config } from "../config.js";
 import { BudgetGuard, type PaymentRequirement } from "./guard.js";
 
 export interface PurchaseResult {
@@ -66,57 +66,61 @@ function ignoreAgentKitAnalyticsFailures() {
   });
 }
 
-type AgentKitWallets = Pick<typeof import("@coinbase/agentkit"), "CdpEvmWalletProvider" | "ViemWalletProvider">;
+type ViemWalletProviderClass = typeof import("@coinbase/agentkit").ViemWalletProvider;
 
 /**
  * AgentKit's package entry loads ~30 integrations we don't use (Solana, OpenSea,
  * Zora, Sushi…): minutes to load on a slow disk and hundreds of MB in a
- * serverless bundle. Its "exports" only exposes that entry, so load the two
- * wallet providers by file path instead (their own imports are small: the CDP
- * SDK, viem, md5). Falls back to the full package if the layout ever changes.
+ * serverless bundle. Its "exports" only exposes that entry, so load the one
+ * wallet provider we need by file path (it only needs viem and md5). Falls back
+ * to the full package if the layout ever changes.
  */
-async function loadAgentKitWallets(): Promise<AgentKitWallets> {
+async function loadViemWalletProvider(): Promise<ViemWalletProviderClass> {
   try {
     const req = createRequire(import.meta.url);
-    return {
-      CdpEvmWalletProvider: req("../../node_modules/@coinbase/agentkit/dist/wallet-providers/cdpEvmWalletProvider.js").CdpEvmWalletProvider,
-      ViemWalletProvider: req("../../node_modules/@coinbase/agentkit/dist/wallet-providers/viemWalletProvider.js").ViemWalletProvider,
-    };
+    return req("../../node_modules/@coinbase/agentkit/dist/wallet-providers/viemWalletProvider.js").ViemWalletProvider;
   } catch {
     // Held in a variable so serverless bundlers don't trace (and ship) the whole package.
     const pkg = "@coinbase/agentkit";
-    return (await import(pkg)) as AgentKitWallets;
+    return ((await import(pkg)) as typeof import("@coinbase/agentkit")).ViemWalletProvider;
   }
+}
+
+/**
+ * The CDP server wallet. We build it with the CDP SDK's ES-module build and hand
+ * it to AgentKit as a viem account, rather than using AgentKit's
+ * CdpEvmWalletProvider: that class is CommonJS, pulls in the SDK's CommonJS build,
+ * which then require()s `jose` (ES-module only) and fails on serverless Node
+ * (e.g. Vercel). Keys still never leave CDP: every signature is a CDP API call.
+ */
+async function cdpAccount() {
+  const w = config.wallet;
+  const { CdpClient } = await import("@coinbase/cdp-sdk");
+  const cdp = new CdpClient({ apiKeyId: w.cdpApiKeyId, apiKeySecret: w.cdpApiKeySecret, walletSecret: w.cdpWalletSecret });
+  return w.cdpAddress
+    ? cdp.evm.getAccount({ address: w.cdpAddress as `0x${string}` })
+    : // A stable name, so every run (and every serverless instance) gets the same wallet.
+      cdp.evm.getOrCreateAccount({ name: "tender-buyer" });
 }
 
 async function makeWallet(): Promise<EvmWalletProvider> {
   ignoreAgentKitAnalyticsFailures();
-  const { CdpEvmWalletProvider, ViemWalletProvider } = await loadAgentKitWallets();
+  const ViemWalletProvider = await loadViemWalletProvider();
   const w = config.wallet;
-  if (w.cdpApiKeyId && w.cdpApiKeySecret && w.cdpWalletSecret) {
-    return CdpEvmWalletProvider.configureWithWallet({
-      apiKeyId: w.cdpApiKeyId,
-      apiKeySecret: w.cdpApiKeySecret,
-      walletSecret: w.cdpWalletSecret,
-      address: w.cdpAddress as `0x${string}` | undefined,
-      networkId: AGENTKIT_NETWORK[config.network],
-      rpcUrl: w.rpcUrl,
-    });
-  }
-  if (w.privateKey) {
-    const chain = config.network === "eip155:8453" ? base : baseSepolia;
-    const client = createWalletClient({
-      account: privateKeyToAccount(w.privateKey as `0x${string}`),
-      chain,
-      transport: http(w.rpcUrl),
-    });
-    // AgentKit bundles its own viem; the runtime shapes match, only the nominal types differ.
-    return new ViemWalletProvider(client as never);
-  }
-  throw new Error(
-    "No buyer wallet configured. Set CDP_API_KEY_ID/CDP_API_KEY_SECRET/CDP_WALLET_SECRET (AgentKit CDP wallet) " +
-      "or BUYER_PRIVATE_KEY, or run with PAYMENTS=mock.",
-  );
+  const chain = config.network === "eip155:8453" ? base : baseSepolia;
+
+  let account;
+  if (w.cdpApiKeyId && w.cdpApiKeySecret && w.cdpWalletSecret) account = toAccount(await cdpAccount());
+  else if (w.privateKey) account = privateKeyToAccount(w.privateKey as `0x${string}`);
+  else
+    throw new Error(
+      "No buyer wallet configured. Set CDP_API_KEY_ID/CDP_API_KEY_SECRET/CDP_WALLET_SECRET (CDP server wallet) " +
+        "or BUYER_PRIVATE_KEY, or run with PAYMENTS=mock.",
+    );
+
+  const client = createWalletClient({ account, chain, transport: http(w.rpcUrl) });
+  // AgentKit bundles its own viem; the runtime shapes match, only the nominal types differ.
+  return new ViemWalletProvider(client as never);
 }
 
 /**

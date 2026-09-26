@@ -1,9 +1,4 @@
-/**
- * Wallet helper.
- *   npm run wallet            → print the buyer's AgentKit wallet address + USDC balance
- *   npm run wallet -- faucet  → (Base Sepolia + CDP keys only) request testnet USDC from the CDP faucet
- *   npm run wallet -- new     → generate a fresh private key for BUYER_PRIVATE_KEY or SELLER_PAY_TO
- */
+
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { CdpClient } from "@coinbase/cdp-sdk";
 import { config } from "../src/config.js";

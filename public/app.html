@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Tender Dashboard</title>
+<link rel="icon" href="/logo.svg" type="image/svg+xml" />
+<link rel="stylesheet" href="/styles.css" />
+<script src="/theme.js"></script>
+<style>
+  .status { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+  @media (max-width: 1100px) { .status .pill.hide-md { display: none; } }
+  @media (max-width: 640px) { .status { display: none; } }
+
+  .dash { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 20px; padding-top: 24px; padding-bottom: 60px; align-items: start; }
+  .side { display: grid; gap: 14px; position: sticky; top: 84px; max-height: calc(100vh - 100px); overflow: auto; padding-bottom: 4px; scrollbar-width: thin; }
+  .main { display: grid; gap: 16px; min-width: 0; }
+  @media (max-width: 1020px) {
+    .dash { grid-template-columns: 1fr; }
+    .side { position: static; max-height: none; order: 2; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+  }
+
+  /* wallet */
+  .bal { font: 500 34px/1 var(--mono); letter-spacing: -0.03em; margin: 8px 0 4px; }
+  .bal small { font-size: 14px; color: var(--muted); letter-spacing: 0; }
+  .addr { display: flex; align-items: center; gap: 6px; font: 12.5px var(--mono); color: var(--muted); }
+  .addr button { border: 0; background: none; color: var(--muted); cursor: pointer; padding: 2px; border-radius: 4px; }
+  .addr button:hover { color: var(--ink); }
+  .addr a { color: var(--blue); text-decoration: none; }
+  .warnbox { margin-top: 12px; padding: 10px 12px; border-radius: 10px; font-size: 13px; background: var(--amber-bg); color: var(--amber); }
+  .errbox { margin-top: 12px; padding: 10px 12px; border-radius: 10px; font-size: 13px; background: var(--red-bg); color: var(--red); word-break: break-word; }
+
+  /* key/value list */
+  .kv { display: grid; gap: 0; font-size: 13.5px; }
+  .kv > div { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-top: 1px dashed var(--line); }
+  .kv > div:first-child { border-top: 0; padding-top: 0; }
+  .kv dt { color: var(--muted); }
+  .kv dd { margin: 0; font-family: var(--mono); font-size: 12.5px; text-align: right; }
+
+  /* history */
+  .hist { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+  .hist button {
+    width: 100%; text-align: left; border: 0; background: transparent; color: inherit; cursor: pointer;
+    padding: 10px; border-radius: 10px; display: grid; gap: 4px; font: inherit;
+  }
+  .hist button:hover, .hist button[aria-current="true"] { background: var(--paper-2); }
+  .hist .q { font-size: 13.5px; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .hist .m { display: flex; flex-wrap: wrap; gap: 2px 10px; font: 11.5px var(--mono); color: var(--muted); }
+  .hist .m span { white-space: nowrap; }
+  .empty { color: var(--muted); font-size: 13.5px; padding: 6px 0; }
+
+  /* composer */
+  .composer { padding: 22px; }
+  .composer label.big { display: block; font: 400 30px/1.1 var(--serif); letter-spacing: -0.01em; margin-bottom: 14px; }
+  .composer textarea {
+    width: 100%; resize: none; min-height: 64px; max-height: 180px;
+    border: 1px solid var(--line-2); border-radius: 14px; background: var(--paper); color: var(--ink);
+    padding: 14px 16px; font: 16px/1.5 var(--sans); outline: none; transition: border-color .15s, box-shadow .15s;
+  }
+  .composer textarea:focus { border-color: var(--ink-2); box-shadow: 0 0 0 4px color-mix(in srgb, var(--ink) 8%, transparent); }
+  .controls { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 12px; }
+  .seg { display: inline-flex; padding: 3px; border-radius: 999px; background: var(--paper-2); border: 1px solid var(--line); }
+  .seg button { border: 0; background: transparent; color: var(--muted); font: 500 13px var(--mono); padding: 7px 12px; border-radius: 999px; cursor: pointer; }
+  .seg button[aria-pressed="true"] { background: var(--card); color: var(--ink); box-shadow: var(--shadow); }
+  .custom { display: inline-flex; align-items: center; gap: 4px; height: 36px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--line-2); background: var(--paper); font: 13px var(--mono); color: var(--muted); }
+  .custom input { width: 64px; border: 0; background: transparent; color: var(--ink); font: 13px var(--mono); outline: none; }
+  .controls .go { margin-left: auto; }
+  .hint { font-size: 12px; color: var(--faint); margin-top: 10px; }
+  .hint kbd { font: 11px var(--mono); padding: 1px 5px; border: 1px solid var(--line-2); border-bottom-width: 2px; border-radius: 4px; color: var(--muted); }
+  .examples { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
+  .examples button {
+    border: 1px dashed var(--line-2); background: transparent; color: var(--muted); border-radius: 999px;
+    padding: 6px 12px; font: 13px var(--sans); cursor: pointer; text-align: left;
+  }
+  .examples button:hover { color: var(--ink); border-color: var(--ink-2); border-style: solid; }
+  .examples .t { font: 600 10px var(--sans); letter-spacing: .08em; text-transform: uppercase; color: var(--faint); margin-right: 6px; }
+
+  /* meter */
+  .meter { padding: 18px 22px; display: grid; gap: 12px; }
+  .meter-top { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  .meter-top .big { font: 500 28px/1 var(--mono); letter-spacing: -0.03em; }
+  .meter-top .big small { font-size: 14px; color: var(--muted); letter-spacing: 0; }
+  .meter-stats { display: flex; gap: 16px; font: 12.5px var(--mono); color: var(--muted); flex-wrap: wrap; }
+  .meter-stats b { color: var(--ink); font-weight: 500; }
+  .bar { position: relative; height: 14px; border-radius: 999px; background: var(--paper-2); border: 1px solid var(--line); overflow: hidden; display: flex; }
+  .bar i { display: block; height: 100%; background: var(--green); transition: width .5s cubic-bezier(.2,.7,.2,1); border-right: 2px solid var(--card); }
+  .bar i:last-child { border-right: 0; }
+  .bar .ghost { background: repeating-linear-gradient(45deg, color-mix(in srgb, var(--red) 55%, transparent) 0 4px, transparent 4px 8px); }
+  .legend { display: flex; gap: 14px; font-size: 12px; color: var(--muted); flex-wrap: wrap; }
+  .legend span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+  .legend .l-spent::before { background: var(--green); }
+  .legend .l-block::before { background: repeating-linear-gradient(45deg, var(--red) 0 2px, transparent 2px 4px); border: 1px solid var(--red); }
+  .legend .l-left::before { background: var(--paper-2); border: 1px solid var(--line-2); }
+
+  /* results grid */
+  .results { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr); gap: 16px; align-items: start; }
+  @media (max-width: 1240px) { .results { grid-template-columns: 1fr; } }
+
+  /* timeline */
+  .tl { list-style: none; margin: 0; padding: 6px 18px 18px; }
+  .tl li { position: relative; display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 12px; padding: 12px 0; animation: rise .3s ease both; }
+  .tl li:not(:last-child)::before { content: ""; position: absolute; left: 16px; top: 44px; bottom: -10px; width: 2px; background: var(--line); }
+  .tl .ic { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; }
+  .tl .ic svg { width: 17px; height: 17px; }
+  .tl .ttl { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 14.5px; font-weight: 600; min-height: 34px; }
+  .tl .body { color: var(--ink-2); font-size: 14px; margin-top: 2px; }
+  .tl .why { color: var(--muted); font-style: italic; font-size: 13.5px; margin-top: 4px; border-left: 2px solid var(--line-2); padding-left: 10px; }
+  .tl .meta { font: 12px var(--mono); color: var(--muted); margin-top: 6px; display: flex; gap: 10px; flex-wrap: wrap; }
+  .tl .meta a { color: var(--blue); text-decoration: none; }
+  .tl .meta a:hover { text-decoration: underline; }
+  .conf { display: inline-flex; align-items: center; gap: 6px; font: 500 11.5px var(--mono); color: var(--muted); }
+  .conf .track { width: 44px; height: 5px; border-radius: 3px; background: var(--paper-2); overflow: hidden; }
+  .conf .track i { display: block; height: 100%; background: var(--ink-2); }
+  .ic.ink { background: var(--paper-2); color: var(--ink); }
+  .ic.amber { background: var(--amber-bg); color: var(--amber); }
+  .ic.green { background: var(--green-bg); color: var(--green); }
+  .ic.red { background: var(--red-bg); color: var(--red); }
+  .ic.blue { background: var(--blue-bg); color: var(--blue); }
+  .thinking .ttl { color: var(--muted); font-weight: 500; }
+  .dots::after { content: "…"; animation: pulse 1.2s ease infinite; }
+
+  .placeholder { padding: 44px 24px; text-align: center; color: var(--muted); }
+  .placeholder .serif { font-size: 26px; color: var(--ink); margin-bottom: 6px; }
+  .placeholder svg { width: 44px; height: 44px; margin: 0 auto 14px; color: var(--faint); }
+
+  /* answer */
+  .answer { padding: 22px; }
+  .answer .text { font: 400 22px/1.4 var(--serif); letter-spacing: -0.005em; margin: 12px 0 14px; }
+  .answer .reason { font-size: 13.5px; color: var(--muted); }
+  .answer-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+  .cbig { display: flex; align-items: center; gap: 10px; font: 500 12px var(--mono); color: var(--muted); }
+  .cbig .track { width: 90px; height: 6px; border-radius: 3px; background: var(--paper-2); overflow: hidden; }
+  .cbig .track i { display: block; height: 100%; background: var(--green); transition: width .6s ease; }
+
+  .right { display: grid; gap: 16px; min-width: 0; }
+  .right > * { min-width: 0; }
+  .answer .text, .answer .reason, .tl .body, .tl .why, .receipt { overflow-wrap: anywhere; }
+  .receipt-wrap { padding: 4px 6px 8px; }
+  .receipt { animation: print .9s cubic-bezier(.2,.7,.2,1) both; }
+  .r-actions { display: flex; gap: 8px; justify-content: center; margin-top: 14px; flex-wrap: wrap; }
+
+  /* evidence */
+  details.ev { border-top: 1px solid var(--line); }
+  details.ev:first-of-type { border-top: 0; }
+  details.ev summary { cursor: pointer; list-style: none; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 18px; font-size: 14px; }
+  details.ev summary::-webkit-details-marker { display: none; }
+  details.ev summary::after { content: "+"; font: 16px var(--mono); color: var(--muted); }
+  details.ev[open] summary::after { content: "−"; }
+  details.ev pre { margin: 0; padding: 14px 18px 18px; font: 12px/1.55 var(--mono); color: var(--ink-2); background: var(--paper); overflow: auto; max-height: 340px; border-top: 1px dashed var(--line); }
+  .banner { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 12px; font-size: 13.5px; background: var(--blue-bg); color: var(--blue); }
+  .banner button { margin-left: auto; }
+</style>
+</head>
+<body>
+<header class="nav">
+  <div class="wrap nav-in" style="max-width:1440px">
+    <a class="brand" href="/"><img src="/logo.svg" alt="" />Tender</a>
+    <nav class="nav-links" aria-label="Pages">
+      <a href="/">Website</a>
+      <a href="/app" aria-current="page">Dashboard</a>
+    </nav>
+    <div class="nav-right">
+      <div class="status" id="status"><span class="pill"><span class="spinner" style="width:10px;height:10px"></span>connecting</span></div>
+      <button class="icon-btn" data-theme-toggle type="button"></button>
+    </div>
+  </div>
+</header>
+
+<div class="wrap dash" style="max-width:1440px">
+  <!-- ================================= sidebar -->
+  <aside class="side" aria-label="Wallet, policy and history">
+    <section class="card">
+      <div class="card-h"><h2>Buyer wallet</h2><span class="tag plain" id="payMode">…</span></div>
+      <div class="card-b">
+        <div class="eyebrow">USDC balance</div>
+        <div class="bal" id="bal">–</div>
+        <div class="addr" id="addr"></div>
+        <div id="walletNote"></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-h"><h2>Guard policy</h2><span class="tag green">enforced in code</span></div>
+      <div class="card-b"><dl class="kv" id="policy"><div><dt>loading</dt><dd></dd></div></dl></div>
+    </section>
+
+    <section class="card">
+      <div class="card-h"><h2>Price list</h2><span class="tag plain">free to read</span></div>
+      <div class="card-b"><dl class="kv" id="prices"><div><dt>loading</dt><dd></dd></div></dl></div>
+    </section>
+
+    <section class="card">
+      <div class="card-h"><h2>History</h2><button class="btn btn-ghost btn-sm" id="newRun" type="button" style="height:28px;padding:0 10px">New</button></div>
+      <div class="card-b" style="padding:8px"><ul class="hist" id="hist"><li class="empty" style="padding:10px">No runs yet.</li></ul></div>
+    </section>
+  </aside>
+
+  <!-- ================================= main -->
+  <main class="main">
+    <form class="card composer" id="form" autocomplete="off">
+      <label class="big" for="q">What do you want to know?</label>
+      <textarea id="q" rows="2" maxlength="500" placeholder="Ask about BTC, ETH, SOL, LINK or AERO…" required></textarea>
+      <div class="controls">
+        <span class="eyebrow" style="margin-right:2px">Budget</span>
+        <div class="seg" id="presets" role="group" aria-label="Budget presets"></div>
+        <label class="custom" title="Custom budget in USD">$<input id="budget" inputmode="decimal" aria-label="Custom budget in USD" /></label>
+        <button class="btn btn-primary go" id="go" type="submit">Shop <span class="arrow">→</span></button>
+      </div>
+      <div class="examples" id="examples"></div>
+      <div class="hint"><kbd>Enter</kbd> to shop · <kbd>Shift</kbd>+<kbd>Enter</kbd> new line · <kbd>Esc</kbd> to stop</div>
+    </form>
+
+    <div id="viewBanner"></div>
+
+    <section class="card meter" aria-live="polite">
+      <div class="meter-top">
+        <div><div class="eyebrow">Spent</div><div class="big" id="mSpent">$0.000 <small id="mOf">of –</small></div></div>
+        <div class="meter-stats">
+          <span>steps <b id="mSteps">0</b></span>
+          <span>bought <b id="mBought">0</b></span>
+          <span>blocked <b id="mBlocked">0</b></span>
+          <span>time <b id="mTime">0.0s</b></span>
+        </div>
+      </div>
+      <div class="bar" id="bar"></div>
+      <div class="legend"><span class="l-spent">paid</span><span class="l-block">blocked by guard</span><span class="l-left">unspent</span></div>
+    </section>
+
+    <div class="results">
+      <section class="card">
+        <div class="card-h"><h2>Live</h2><span class="tag plain" id="runState">idle</span></div>
+        <ol class="tl" id="tl">
+          <li style="display:block;animation:none" class="placeholder">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><path d="M3 6h18M16 10a4 4 0 0 1-8 0"/></svg>
+            <div class="serif">Nothing in the basket yet.</div>
+            Ask a question and watch every decision here: what SERV proposes, what the guard allows, and every payment.
+          </li>
+        </ol>
+      </section>
+
+      <div class="right">
+        <section class="card answer" id="answerCard">
+          <div class="answer-head"><span class="eyebrow">Answer</span><span class="cbig" id="conf"></span></div>
+          <div class="text muted" id="answer" style="font-size:18px">The answer appears here, with how confident the agent is.</div>
+          <div class="reason" id="reason"></div>
+        </section>
+        <div class="receipt-wrap" id="receiptWrap"></div>
+      </div>
+    </div>
+
+    <section class="card" id="evidenceCard" hidden>
+      <div class="card-h"><h2>Evidence bought</h2><span class="tag plain">exactly what was paid for</span></div>
+      <div id="evidence"></div>
+    </section>
+  </main>
+</div>
+
+<div class="toasts" id="toasts" aria-live="assertive"></div>
+<script src="/app.js"></script>
+</body>
+</html>

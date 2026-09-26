@@ -1,0 +1,40 @@
+{
+  "name": "tender",
+  "version": "1.0.0",
+  "description": "Tender: an agent that pays for exactly the data it needs. SERV Reasoning decides what data is worth buying; a code guard caps spend; AgentKit wallet pays over x402.",
+  "scripts": {
+    "test": "node --import tsx --test test/*.test.ts",
+    "demo": "tsx src/app.ts",
+    "seller": "tsx src/seller/main.ts",
+    "shop": "tsx src/cli.ts",
+    "typecheck": "tsc",
+    "wallet": "tsx scripts/wallet.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@coinbase/agentkit": "^0.10.4",
+    "@coinbase/cdp-sdk": "^1.56.0",
+    "@coinbase/x402": "^2.1.0",
+    "@x402/core": "^2.27.0",
+    "@x402/evm": "^2.27.0",
+    "@x402/express": "^2.27.0",
+    "@x402/fetch": "^2.27.0",
+    "dotenv": "^18.0.3",
+    "express": "^5.2.1",
+    "openai": "^7.22.0",
+    "viem": "^2.56.8",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^26.6.2",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3"
+  }
+}

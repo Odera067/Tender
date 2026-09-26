@@ -29,13 +29,24 @@ if (!USDC[network]) throw new Error(`unsupported X402_NETWORK ${network}; use ei
 /** Real money. Several safety defaults tighten when this is true. */
 const isMainnet = network === "eip155:8453";
 const sellerPort = Number(env("SELLER_PORT", "4021"));
+const appPort = Number(env("APP_PORT", env("PORT", "3000")));
+/** True when running as a Vercel Function. */
+const onVercel = !!process.env.VERCEL;
+/**
+ * Where this app is reachable. The dashboard and the seller share one server,
+ * so this is also the seller's URL unless SELLER_URL points somewhere else.
+ */
+const selfUrl = env("SELLER_URL")
+  ?? (onVercel ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL ?? process.env.VERCEL_URL}` : `http://localhost:${appPort}`);
 
 export const config = {
   network,
   isMainnet,
+  onVercel,
   seller: {
+    /** Only used when the seller runs on its own (npm run seller). */
     port: sellerPort,
-    publicUrl: env("SELLER_URL", `http://localhost:${sellerPort}`)!,
+    publicUrl: selfUrl,
     payTo: env("SELLER_PAY_TO"),
     network,
     /**
@@ -49,8 +60,12 @@ export const config = {
     allowMock: !isMainnet && env("SELLER_ALLOW_MOCK") === "true",
   },
   buyer: {
-    port: Number(env("APP_PORT", "3000")),
-    sellerUrl: env("SELLER_URL", `http://localhost:${sellerPort}`)!,
+    port: appPort,
+    sellerUrl: selfUrl,
+    /** When set, starting a run needs this code. Set it on any public deployment. */
+    accessCode: env("DEMO_ACCESS_CODE"),
+    /** When set, total real spend per UTC day across all runs can't exceed this. */
+    dailySpendCapUsd: env("DAILY_SPEND_CAP_USD"),
     /** "x402" = real payments via AgentKit wallet; "mock" = no money moves (UI/dev only). */
     payments: env("PAYMENTS", "x402") as "x402" | "mock",
     defaultBudgetUsd: env("DEFAULT_BUDGET_USD", "0.05")!,

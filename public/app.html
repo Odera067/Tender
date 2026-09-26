@@ -204,6 +204,10 @@
         <span class="eyebrow" style="margin-right:2px">Budget</span>
         <div class="seg" id="presets" role="group" aria-label="Budget presets"></div>
         <label class="custom" title="Custom budget in USD">$<input id="budget" inputmode="decimal" aria-label="Custom budget in USD" /></label>
+        <label class="custom" id="codeWrap" hidden title="This deployment needs an access code to spend">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+          <input id="code" type="password" autocomplete="off" placeholder="access code" aria-label="Access code" style="width:110px" />
+        </label>
         <button class="btn btn-primary go" id="go" type="submit">Shop <span class="arrow">→</span></button>
       </div>
       <div class="examples" id="examples"></div>

@@ -60,4 +60,4 @@ function log(e: AgentEvent) {
 
 const payer = await createPayer();
 const planner = createPlanner();
-saveRun(await runShopper({ question, budgetUsd: budget, payer, planner, emit: log }));
+await saveRun(await runShopper({ question, budgetUsd: budget, payer, planner, emit: log }));

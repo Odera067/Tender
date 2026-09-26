@@ -88,9 +88,14 @@
       ["Per-purchase cap", `$${p.perCallCap}`],
       ["Max purchases", p.maxPurchases],
       ["Max steps", p.maxSteps],
+      ...(info.daily ? [["Daily cap (UTC)", `${info.daily.spent} of ${info.daily.cap}`]] : []),
       ["Pays only", "the listed seller"],
       ["Token", "USDC"],
     ].map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join("");
+
+    // access code (public deployments)
+    $("codeWrap").hidden = !info.accessRequired;
+    try { if (info.accessRequired && !$("code").value) $("code").value = sessionStorage.getItem("tender-code") || ""; } catch {}
 
     // presets
     const max = usd(p.maxBudget || "1");
@@ -330,12 +335,15 @@
     const budget = $("budget").value.trim();
     if (!q) return $("q").focus();
     if (!/^\d+(\.\d{1,6})?$/.test(budget) || usd(budget) <= 0) return toast("Enter a budget in USD, like 0.05", true);
-    if (info?.policy && usd(budget) > usd(info.policy.maxBudget)) return toast(`Budget is capped at $${info.policy.maxBudget} per question`, true);
+    if (info?.policy && usd(budget) > usd(info.policy.maxBudget)) return toast(`Budget is capped at ${info.policy.maxBudget} per question`, true);
+    const code = $("code").value.trim();
+    if (info?.accessRequired && !code) { $("code").focus(); return toast("Enter the access code to run a real purchase", true); }
 
     resetView(usd(budget));
     setRunning(true);
     timer = setInterval(tickTime, 100);
-    es = new EventSource(`/api/shop?q=${encodeURIComponent(q)}&budget=${encodeURIComponent(budget)}`);
+    try { if (code) sessionStorage.setItem("tender-code", code); } catch {}
+    es = new EventSource(`/api/shop?q=${encodeURIComponent(q)}&budget=${encodeURIComponent(budget)}${code ? `&code=${encodeURIComponent(code)}` : ""}`);
     es.onmessage = (m) => {
       const e = JSON.parse(m.data);
       if (e.type === "done") return finish();

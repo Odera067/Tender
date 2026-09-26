@@ -10,6 +10,7 @@
  * directly so we can attach our own guard hook.
  */
 import type { EvmWalletProvider } from "@coinbase/agentkit";
+import { createRequire } from "node:module";
 import { x402Client, wrapFetchWithPayment, decodePaymentResponseHeader } from "@x402/fetch";
 import { registerExactEvmScheme } from "@x402/evm/exact/client";
 import { decodePaymentRequiredHeader } from "@x402/core/http";
@@ -65,10 +66,32 @@ function ignoreAgentKitAnalyticsFailures() {
   });
 }
 
+type AgentKitWallets = Pick<typeof import("@coinbase/agentkit"), "CdpEvmWalletProvider" | "ViemWalletProvider">;
+
+/**
+ * AgentKit's package entry loads ~30 integrations we don't use (Solana, OpenSea,
+ * Zora, Sushi…): minutes to load on a slow disk and hundreds of MB in a
+ * serverless bundle. Its "exports" only exposes that entry, so load the two
+ * wallet providers by file path instead (their own imports are small: the CDP
+ * SDK, viem, md5). Falls back to the full package if the layout ever changes.
+ */
+async function loadAgentKitWallets(): Promise<AgentKitWallets> {
+  try {
+    const req = createRequire(import.meta.url);
+    return {
+      CdpEvmWalletProvider: req("../../node_modules/@coinbase/agentkit/dist/wallet-providers/cdpEvmWalletProvider.js").CdpEvmWalletProvider,
+      ViemWalletProvider: req("../../node_modules/@coinbase/agentkit/dist/wallet-providers/viemWalletProvider.js").ViemWalletProvider,
+    };
+  } catch {
+    // Held in a variable so serverless bundlers don't trace (and ship) the whole package.
+    const pkg = "@coinbase/agentkit";
+    return (await import(pkg)) as AgentKitWallets;
+  }
+}
+
 async function makeWallet(): Promise<EvmWalletProvider> {
   ignoreAgentKitAnalyticsFailures();
-  // AgentKit is a large package, so load it only when real payments are on.
-  const { CdpEvmWalletProvider, ViemWalletProvider } = await import("@coinbase/agentkit");
+  const { CdpEvmWalletProvider, ViemWalletProvider } = await loadAgentKitWallets();
   const w = config.wallet;
   if (w.cdpApiKeyId && w.cdpApiKeySecret && w.cdpWalletSecret) {
     return CdpEvmWalletProvider.configureWithWallet({

@@ -77,13 +77,12 @@ Fill in `.env`:
 Then:
 
 ```bash
-npm run demo          # seller on :4021, website on http://localhost:3000, dashboard on /app
+npm run demo          # website http://localhost:3000, dashboard /app, seller /catalog (one server)
 ```
 
-or from a terminal:
+or from a second terminal, while `npm run demo` is running:
 
 ```bash
-npm run seller
 npm run shop -- "Has SOL been in an uptrend this month?" --budget 0.02
 ```
 
@@ -152,6 +151,22 @@ public/
   styles.css, theme.js  shared design system, light/dark theme
 test/                   guard + agent-loop tests
 ```
+
+## Deploy to Vercel
+
+The whole app is one Express server (`src/app.ts`): the website, the dashboard, the API and the x402 seller. Vercel runs it as a single function and serves `public/` from its CDN.
+
+1. On vercel.com, click **Add New → Project** and import the GitHub repo. Leave the defaults; there's no build step.
+2. Under **Environment Variables**, add everything from your `.env`, including `CDP_WALLET_ADDRESS`. Without it, every cold start creates a new, empty wallet. Leave out `APP_PORT` and `SELLER_PORT`. Then add:
+   - `SELLER_URL`: your production URL, e.g. `https://tender.vercel.app` (no trailing slash).
+   - `DEMO_ACCESS_CODE`: the site is public, and without a code anyone could spend your wallet's USDC and your SERV credits.
+   - `DAILY_SPEND_CAP_USD`, e.g. `1`: a hard limit on real spend per UTC day, across all visitors.
+3. Optional, for history and stats that survive restarts: in the project, go to **Storage → Marketplace → Upstash Redis** and connect it. It sets `KV_REST_API_URL` and `KV_REST_API_TOKEN`, and Tender uses them automatically. Without it, history lives only as long as a function instance.
+4. **Deploy**, then open `/api/health`. `"ready": true` means the wallet and SERV are set up.
+
+Notes:
+- The first request after a quiet spell is a cold start: the AgentKit wallet loads and the seller connects to the facilitator. Give it a few seconds.
+- Runs stream over SSE and normally finish in well under a minute, inside Vercel's default function time limit.
 
 ## Hackathon submission checklist
 

@@ -1,12 +1,4 @@
-/**
- * Demo app: starts the seller (unless START_SELLER=false) and serves
- *   /      the website (what Tender is, live stats)
- *   /app   the dashboard (ask a question, watch it shop, get a receipt)
- * Each run streams agent events to the browser over SSE and is saved to
- * data/runs.jsonl.
- *
- *   npm run demo  →  http://localhost:3000
- */
+
 import express from "express";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
